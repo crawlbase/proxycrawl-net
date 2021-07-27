@@ -1,10 +1,13 @@
 ﻿using System;
-using System.Linq;
+using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Net.Http;
-using System.Text.Json;
+using System.IO;
+using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+
+using Newtonsoft.Json;
 
 namespace ProxyCrawl
 {
@@ -23,15 +26,17 @@ namespace ProxyCrawl
 
         public string Body { get; protected set; }
 
-        public string StatusCode { get; protected set; }
+        public int? StatusCode { get; protected set; }
 
-        public string OriginalStatus { get; protected set; }
+        public int? OriginalStatus { get; protected set; }
 
-        public string ProxyCrawlStatus { get; protected set; }
+        public int? ProxyCrawlStatus { get; protected set; }
 
         public string URL { get; protected set; }
 
-        public HttpMessageHandler HttpMessageHandler { get; set; }
+        public string StorageURL { get; protected set; }
+
+        public string StorageRID { get; protected set; }
 
         #endregion
 
@@ -50,7 +55,7 @@ namespace ProxyCrawl
 
         #region Methods
 
-        public virtual async Task GetAsync(string url, IDictionary<string, object> options = null)
+        public virtual void Get(string url, IDictionary<string, object> options = null)
         {
             if (string.IsNullOrEmpty(url))
             {
@@ -66,14 +71,19 @@ namespace ProxyCrawl
                 format = options["format"].ToString();
             }
             var uri = PrepareUri(url, options);
-            using (var client = CreateHttpClient())
-            {
-                var response = await client.GetAsync(uri);
-                await PrepareResponse(response, format);
-            }
+            var request = CreateWebRequest(uri);
+            var response = GetResponse(request);
+            ExtractResponse(response, format);
         }
 
-        public virtual async Task PostAsync(string url, IDictionary<string, object> data = null, IDictionary<string, object> options = null)
+        public virtual async Task GetAsync(string url, IDictionary<string, object> options = null)
+        {
+            await Task.Run(() => {
+                Get(url, options);
+            });
+        }
+
+        public virtual void Post(string url, IDictionary data = null, IDictionary<string, object> options = null)
         {
             if (string.IsNullOrEmpty(url))
             {
@@ -93,48 +103,47 @@ namespace ProxyCrawl
                 format = options["format"].ToString();
             }
             var uri = PrepareUri(url, options);
-            HttpContent content = null;
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = "POST";
             if (format == "json")
             {
-                string json = JsonSerializer.Serialize(data);
-                content = new StringContent(json, Encoding.UTF8, "application/json");
+                ConfigureJsonPostRequest(request, data);
             }
             else
             {
-                var nameValueCollection = new List<KeyValuePair<string, string>>();
-                foreach (var key in data.Keys)
-                {
-                    nameValueCollection.Add(new KeyValuePair<string, string>(key, data[key].ToString()));
-                }
-                var formContent = new FormUrlEncodedContent(nameValueCollection.ToArray());
-                content = formContent;
+                ConfigurePostRequest(request, data);
             }
-            using (var client = CreateHttpClient())
-            {
-                var response = await client.PostAsync(uri, content);
-                await PrepareResponse(response, format);
-            }
+            var response = (HttpWebResponse)request.GetResponse();
+            ExtractResponse(response, format);
+        }
+
+        public virtual async Task PostAsync(string url, IDictionary data = null, IDictionary<string, object> options = null)
+        {
+            await Task.Run(() => {
+                Post(url, data, options);
+            });
         }
 
         #endregion
 
         #region Helper Methods
 
-        protected virtual HttpClient CreateHttpClient()
-        {
-            if (HttpMessageHandler != null)
-            {
-                return new HttpClient(HttpMessageHandler);
-            }
-            return new HttpClient();
-        }
-
         protected virtual string GetBaseUrl()
         {
             return "https://api.proxycrawl.com";
         }
 
-        private Uri PrepareUri(string url, IDictionary<string, dynamic> options)
+        private HttpWebRequest CreateWebRequest(Uri uri)
+        {
+            return (HttpWebRequest)WebRequest.Create(uri);
+        }
+
+        private HttpWebResponse GetResponse(HttpWebRequest request)
+        {
+            return (HttpWebResponse)request.GetResponse();
+        }
+
+        private Uri PrepareUri(string url, IDictionary<string, object> options)
         {
             if (options.ContainsKey("url"))
             {
@@ -147,64 +156,143 @@ namespace ProxyCrawl
             }
             options["token"] = Token;
             var uriBuilder = new UriBuilder(GetBaseUrl());
-            var query = string.Join('&', (from key in options.Keys select $"{key}={options[key]}").ToArray());
+            var optionList = new List<string>();
+            foreach (var key in options.Keys)
+            {
+                optionList.Add($"{key}={options[key]}");
+            }
+            var query = string.Join("&", optionList.ToArray());
             uriBuilder.Query = query;
             return uriBuilder.Uri;
         }
 
-        protected virtual async Task PrepareResponse(HttpResponseMessage response, string format)
+        protected virtual void ConfigureJsonPostRequest(HttpWebRequest request, IDictionary data)
         {
-            object body = await ReadResponseBody(response);
-            StatusCode = ((int)response.StatusCode).ToString();
+            if (data.Count == 0) return;
+            var json = JsonConvert.SerializeObject(data, Formatting.Indented);
+            request.ContentType = "application/json";
+            using (var streamWriter = new StreamWriter(request.GetRequestStream()))
+            {
+                streamWriter.Write(json);
+            }
+        }
 
+        protected virtual void ConfigurePostRequest(HttpWebRequest request, IDictionary data)
+        {
+            if (data.Count == 0) return;
+
+            var dataList = new List<string>();
+            foreach (var key in data.Keys)
+            {
+                var value = Uri.EscapeDataString(data[key].ToString());
+                dataList.Add($"{key}={value}");
+            }
+            var postData = string.Join("&", dataList.ToArray());
+            var encodedData = Encoding.ASCII.GetBytes(postData);
+            request.ContentType = "application/x-www-form-urlencoded";
+            request.ContentLength = encodedData.Length;
+            using (var stream = request.GetRequestStream())
+            {
+                stream.Write(encodedData, 0, encodedData.Length);
+            }
+        }
+
+        protected virtual void ExtractResponse(HttpWebResponse response, string format)
+        {
+            string body = ReadResponseBody(response);
+            StatusCode = (int)response.StatusCode;
             if (format == "json")
             {
-                JsonElement jsonBody = JsonSerializer.Deserialize<dynamic>(body.ToString());
-                ExtractJsonBody(jsonBody);
+                ExtractJsonResponseBody(body);
             }
             else
             {
                 ExtractResponseBody(response, body);
             }
+            TryParseStorageRID();
         }
 
-        protected virtual async Task<object> ReadResponseBody(HttpResponseMessage response)
+        protected virtual void ExtractJsonResponseBody(string body)
         {
-            return await response.Content.ReadAsStringAsync();
+            using (var reader = new JsonTextReader(new StringReader(body)))
+            {
+                string currentPropertyName = null;
+                while (reader.Read())
+                {
+                    if (reader.Value != null)
+                    {
+                        if (reader.TokenType == JsonToken.PropertyName)
+                        {
+                            currentPropertyName = reader.Value.ToString();
+                        }
+                        else if (currentPropertyName == "original_status")
+                        {
+                            int _originalStatus = 0;
+                            if (int.TryParse(reader.Value.ToString(), out _originalStatus))
+                            {
+                                OriginalStatus = _originalStatus;
+                            }
+                        }
+                        else if (currentPropertyName == "pc_status")
+                        {
+                            int _pcStatus = 0;
+                            if (int.TryParse(reader.Value.ToString(), out _pcStatus))
+                            {
+                                ProxyCrawlStatus = _pcStatus;
+                            }
+                        }
+                        else if (currentPropertyName == "url")
+                        {
+                            URL = reader.Value.ToString();
+                        }
+                        else if (currentPropertyName == "storage_url")
+                        {
+                            StorageURL = reader.Value.ToString();
+                        }
+                    }
+                }
+            }
+            Body = body;
         }
 
-        protected virtual void ExtractJsonBody(JsonElement jsonBody)
+        protected virtual string ReadResponseBody(WebResponse response)
         {
-            OriginalStatus = jsonBody.GetProperty("original_status").ToString();
-            ProxyCrawlStatus = jsonBody.GetProperty("pc_status").ToString();
-            URL = jsonBody.GetProperty("url").ToString();
-            Body = jsonBody.GetProperty("body").ToString();
+            using (var stream = response.GetResponseStream())
+            {
+                using (var reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
         }
 
-        protected virtual void ExtractResponseBody(HttpResponseMessage response, object body)
+        protected virtual void ExtractResponseBody(HttpWebResponse response, string body)
         {
-            IEnumerable<string> originalStatusEnumerable;
-            response.Headers.TryGetValues("original_status", out originalStatusEnumerable);
-            if (originalStatusEnumerable != null && originalStatusEnumerable.Count() > 0)
+            int _originalStatus = 0;
+            if (int.TryParse(response.Headers["original_status"], out _originalStatus))
             {
-                OriginalStatus = originalStatusEnumerable.FirstOrDefault();
+                OriginalStatus = _originalStatus;
             }
-
-            IEnumerable<string> pc_statusEnumerable = null;
-            response.Headers.TryGetValues("pc_status", out pc_statusEnumerable);
-            if (pc_statusEnumerable != null && pc_statusEnumerable.Count() > 0)
+            int _pcStatus = 0;
+            if (int.TryParse(response.Headers["pc_status"], out _pcStatus))
             {
-                ProxyCrawlStatus = pc_statusEnumerable.FirstOrDefault();
+                ProxyCrawlStatus = _pcStatus;
             }
+            URL = response.Headers["url"];
+            StorageURL = response.Headers["storage_url"];
+            Body = body;
+        }
 
-            IEnumerable<string> urlEnumerable;
-            response.Headers.TryGetValues("url", out urlEnumerable);
-            if (urlEnumerable != null && urlEnumerable.Count() > 0)
+        private void TryParseStorageRID()
+        {
+            if (string.IsNullOrEmpty(StorageURL)) return;
+
+            var rx = new Regex(@"rid=(\w+)");          
+            if (rx.IsMatch(StorageURL))
             {
-                URL = urlEnumerable.FirstOrDefault();
+                var match = rx.Match(StorageURL);
+                try { StorageRID = match.Groups[1].Value; } catch { }
             }
-
-            Body = body.ToString();
         }
 
         #endregion

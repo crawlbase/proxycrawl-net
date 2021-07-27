@@ -1,14 +1,16 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
-using System.Net.Http;
-using System.Text.Json;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ProxyCrawl
 {
     public class ScraperAPI : API
     {
-
         #region Properties
 
         public int RemainingRequests { get; private set; }
@@ -25,7 +27,12 @@ namespace ProxyCrawl
 
         #region Methods
 
-        public override Task PostAsync(string url, IDictionary<string, object> data = null, IDictionary<string, object> options = null)
+        public override void Post(string url, IDictionary data = null, IDictionary<string, object> options = null)
+        {
+            throw new Exception("Only GET is allowed for the ScraperAPI");
+        }
+
+        public override async Task PostAsync(string url, IDictionary data = null, IDictionary<string, object> options = null)
         {
             throw new Exception("Only GET is allowed for the ScraperAPI");
         }
@@ -39,18 +46,32 @@ namespace ProxyCrawl
             return "https://api.proxycrawl.com/scraper";
         }
 
-        protected override async Task PrepareResponse(HttpResponseMessage response, string format)
+        protected override void ExtractResponse(HttpWebResponse response, string format)
         {
-            await base.PrepareResponse(response, "json");
+            base.ExtractResponse(response, "json");
         }
 
-        protected override void ExtractJsonBody(JsonElement jsonBody)
+        protected override void ExtractJsonResponseBody(string body)
         {
-            base.ExtractJsonBody(jsonBody);
-            var remainingRequests = 0;
-            var remainingRequestsString = jsonBody.GetProperty("remaining_requests").ToString();
-            int.TryParse(remainingRequestsString, out remainingRequests);
-            RemainingRequests = remainingRequests;
+            base.ExtractJsonResponseBody(body);
+            var jobject = (JObject)JsonConvert.DeserializeObject(body);
+            foreach (var token in jobject.Children())
+            {
+                string propertyName = token.Path;
+                string value = token.Last?.ToString();
+                if (propertyName == "remaining_requests")
+                {
+                    int _remainingRequests = 0;
+                    if (int.TryParse(value, out _remainingRequests))
+                    {
+                        RemainingRequests = _remainingRequests;
+                    }
+                }
+                else if (propertyName == "body")
+                {
+                    Body = value;
+                }
+            }
         }
 
         #endregion

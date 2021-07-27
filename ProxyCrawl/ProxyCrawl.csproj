@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFrameworks>netcoreapp2.0;net45;netstandard2.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Copyright>ProxyCrawl 2021</Copyright>
@@ -17,9 +17,12 @@
 - Crawling API
 - Scraper API
 - Leads API
-- Screenshots API</PackageReleaseNotes>
+- Screenshots API
+- Storage API</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/proxycrawl/proxycrawl-net</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,6 +34,10 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
 </Project>

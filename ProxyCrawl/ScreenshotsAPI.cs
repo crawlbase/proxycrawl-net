@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Linq;
+using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Net.Http;
-using System.Text.Json;
-using System.Text;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace ProxyCrawl
 {
@@ -24,7 +22,7 @@ namespace ProxyCrawl
 
         public string ScreenshotPath { get; private set; }
 
-        public bool IsSuccess { get; private set; }
+        public bool Success { get; private set; }
 
         public int RemainingRequests { get; private set; }
 
@@ -42,12 +40,17 @@ namespace ProxyCrawl
 
         #region Methods
 
-        public override Task PostAsync(string url, IDictionary<string, object> data = null, IDictionary<string, object> options = null)
+        public override void Post(string url, IDictionary data = null, IDictionary<string, object> options = null)
         {
             throw new Exception("Only GET is allowed for the ScreenshotsAPI");
         }
 
-        public override async Task GetAsync(string url, IDictionary<string, object> options = null)
+        public override async Task PostAsync(string url, IDictionary data = null, IDictionary<string, object> options = null)
+        {
+            throw new Exception("Only GET is allowed for the ScraperAPI");
+        }
+
+        public override void Get(string url, IDictionary<string, object> options = null)
         {
             if (options == null)
             {
@@ -69,7 +72,7 @@ namespace ProxyCrawl
             {
                 throw new Exception(INVALID_SAVE_TO_PATH_FILENAME);
             }
-            await base.GetAsync(url, options);
+            base.Get(url, options);
         }
 
         #endregion
@@ -81,53 +84,40 @@ namespace ProxyCrawl
             return "https://api.proxycrawl.com/screenshots";
         }
 
-        protected override async Task PrepareResponse(HttpResponseMessage response, string format)
+        protected override void ExtractResponse(HttpWebResponse response, string format)
         {
-            await base.PrepareResponse(response, null);
+            base.ExtractResponse(response, null);
         }
 
-        protected override async Task<object> ReadResponseBody(HttpResponseMessage response)
+        protected override string ReadResponseBody(WebResponse response)
         {
-            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var stream = response.GetResponseStream())
             {
                 using (var fileStream = File.Create(ScreenshotPath))
                 {
-                    stream.Seek(0, SeekOrigin.Begin);
-                    stream.CopyTo(fileStream);
+                    int iStrmByte;
+                    while ((iStrmByte = stream.ReadByte()) != -1)
+                    {
+                        fileStream.WriteByte(Convert.ToByte(iStrmByte));
+                    }
                 }
             }
             byte[] bytes = File.ReadAllBytes(ScreenshotPath);
             return Convert.ToBase64String(bytes);
         }
 
-        protected override void ExtractResponseBody(HttpResponseMessage response, object body)
+        protected override void ExtractResponseBody(HttpWebResponse response, string body)
         {
             base.ExtractResponseBody(response, body);
-
-            IEnumerable<string> remainingRequestsEnumerable;
-            response.Headers.TryGetValues("remaining_requests", out remainingRequestsEnumerable);
-            if (remainingRequestsEnumerable != null && remainingRequestsEnumerable.Count() > 0)
+            int _remainingRequests = 0;
+            if (int.TryParse(response.Headers["remaining_requests"], out _remainingRequests))
             {
-                int remainingRequests = 0;
-                int.TryParse(remainingRequestsEnumerable.FirstOrDefault().ToString(), out remainingRequests);
-                RemainingRequests = remainingRequests;
+                RemainingRequests = _remainingRequests;
             }
-
-            IEnumerable<string> successEnumerable;
-            response.Headers.TryGetValues("success", out successEnumerable);
-            if (successEnumerable != null && successEnumerable.Count() > 0)
-            {
-                bool isSuccess = false;
-                bool.TryParse(successEnumerable.FirstOrDefault().ToString(), out isSuccess);
-                IsSuccess = isSuccess;
-            }
-
-            IEnumerable<string> screenshotUrlEnumerable;
-            response.Headers.TryGetValues("screenshot_url", out screenshotUrlEnumerable);
-            if (screenshotUrlEnumerable != null && screenshotUrlEnumerable.Count() > 0)
-            {
-                ScreenshotUrl = screenshotUrlEnumerable.FirstOrDefault();
-            }
+            bool _success = false;
+            bool.TryParse(response.Headers["success"], out _success);
+            Success = _success;
+            ScreenshotUrl = response.Headers["screenshot_url"];
         }
 
         private string GenerateFilename()

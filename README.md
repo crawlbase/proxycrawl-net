@@ -6,6 +6,18 @@
 
 See [nuget package](https://www.nuget.org/packages/ProxyCrawlAPI/)
 
+## Asynchronous Programming
+
+Every method has a corresponding async version. 
+
+i.e. 
+
+`Get` has an async version  `GetAsync` while, 
+
+`Post` has an async version named `PostAsync`, 
+
+and so on...
+
 ## Crawling API Usage
 
 Initialize the API with one of your account tokens, either normal or javascript token. Then make get or post requests accordingly.
@@ -21,14 +33,14 @@ ProxyCrawl.API api = new ProxyCrawl.API("YOUR_TOKEN");
 Pass the url that you want to scrape plus any options from the ones available in the [API documentation](https://proxycrawl.com/dashboard/docs).
 
 ```csharp
-await api.GetAsync(url, options);
+api.Get(url, options);
 ```
 
 Example:
 
 ```csharp
 try {
-  await api.GetAsync("https://www.facebook.com/britneyspears");
+  api.Get("https://www.facebook.com/britneyspears");
   Console.WriteLine(api.StatusCode);
   Console.WriteLine(api.OriginalStatus);
   Console.WriteLine(api.ProxyCrawlStatus);
@@ -43,7 +55,7 @@ You can pass any options of what the ProxyCrawl API supports in exact dictionary
 Example:
 
 ```csharp
-await api.GetAsync("https://www.reddit.com/r/pics/comments/5bx4bx/thanks_obama/", new Dictionary<string, object>() {
+api.Get("https://www.reddit.com/r/pics/comments/5bx4bx/thanks_obama/", new Dictionary<string, object>() {
   {"user_agent", "Mozilla/5.0 (Windows NT 6.2; rv:20.0) Gecko/20121202 Firefox/30.0"},
   {"format", "json"},
 });
@@ -52,18 +64,31 @@ Console.WriteLine(api.StatusCode);
 Console.WriteLine(api.Body);
 ```
 
+Optionally pass [store](https://proxycrawl.com/docs/crawling-api/parameters/#store) parameter to `true` to store a copy of the API response in the [ProxyCrawl Cloud Storage](https://proxycrawl.com/dashboard/storage).
+
+Example:
+
+```csharp
+api.Get("https://www.reddit.com/r/pics/comments/5bx4bx/thanks_obama/", new Dictionary<string, object>() {
+  {"store", "true"},
+});
+
+Console.WriteLine(api.StorageURL);
+Console.WriteLine(api.StorageRID);
+```
+
 ### POST requests
 
 Pass the url that you want to scrape, the data that you want to send which can be either a json or a string, plus any options from the ones available in the [API documentation](https://proxycrawl.com/dashboard/docs).
 
 ```csharp
-await api.PostAsync(url, data, options);
+api.Post(url, data, options);
 ```
 
 Example:
 
 ```csharp
-await api.PostAsync("https://producthunt.com/search", new Dictionary<string, object>() {
+api.Post("https://producthunt.com/search", new Dictionary<string, object>() {
   {"text", "example search"},
 });
 Console.WriteLine(api.StatusCode);
@@ -73,7 +98,7 @@ Console.WriteLine(api.Body);
 You can send the data as application/json instead of x-www-form-urlencoded by setting options `post_content_type` as json.
 
 ```csharp
-await api.PostAsync("https://httpbin.org/post", new Dictionary<string, object>() {
+api.Post("https://httpbin.org/post", new Dictionary<string, object>() {
   {"some_json", "with some value"},
 }, new Dictionary<string, object>() {
   {"post_content_type", "json"},
@@ -84,14 +109,14 @@ Console.WriteLine(api.Body);
 
 ### Javascript requests
 
-If you need to scrape any website built with Javascript like React, Angular, Vue, etc. You just need to pass your javascript token and use the same calls. Note that only `GetAsync` is available for javascript and not `PostAsync`.
+If you need to scrape any website built with Javascript like React, Angular, Vue, etc. You just need to pass your javascript token and use the same calls. Note that only `Get` is available for javascript and not `Post`.
 
 ```csharp
 ProxyCrawl.API api = new ProxyCrawl.API("YOUR_JAVASCRIPT_TOKEN");
 ```
 
 ```csharp
-await api.GetAsync("https://www.nfl.com");
+api.Get("https://www.nfl.com");
 Console.WriteLine(api.StatusCode);
 Console.WriteLine(api.Body);
 ```
@@ -99,7 +124,7 @@ Console.WriteLine(api.Body);
 Same way you can pass javascript additional options.
 
 ```csharp
-await api.GetAsync("https://www.freelancer.com", new Dictionary<string, object>() {
+api.Get("https://www.freelancer.com", new Dictionary<string, object>() {
   {"page_wait", "5000"},
 });
 Console.WriteLine(api.StatusCode);
@@ -110,14 +135,14 @@ Console.WriteLine(api.StatusCode);
 You can always get the original status and proxycrawl status from the response. Read the [ProxyCrawl documentation](https://proxycrawl.com/dashboard/docs) to learn more about those status.
 
 ```csharp
-await api.GetAsync("https://sfbay.craigslist.org/");
+api.Get("https://sfbay.craigslist.org/");
 Console.WriteLine(api.OriginalStatus);
 Console.WriteLine(api.ProxyCrawlStatus);
 ```
 
 ## Scraper API usage
 
-Initialize the Scraper API using your normal token and call the `GetAsync` method.
+Initialize the Scraper API using your normal token and call the `Get` method.
 
 ```csharp
 ProxyCrawl.ScraperAPI scraper_api = new ProxyCrawl.ScraperAPI("YOUR_TOKEN");
@@ -126,14 +151,14 @@ ProxyCrawl.ScraperAPI scraper_api = new ProxyCrawl.ScraperAPI("YOUR_TOKEN");
 Pass the url that you want to scrape plus any options from the ones available in the [Scraper API documentation](https://proxycrawl.com/docs/scraper-api/parameters).
 
 ```csharp
-await scraper_api.GetAsync(url, options);
+scraper_api.Get(url, options);
 ```
 
 Example:
 
 ```csharp
 try {
-  await scraper_api.GetAsync("https://www.amazon.com/Halo-SleepSack-Swaddle-Triangle-Neutral/dp/B01LAG1TOS");
+  scraper_api.Get("https://www.amazon.com/Halo-SleepSack-Swaddle-Triangle-Neutral/dp/B01LAG1TOS");
   Console.WriteLine(scraper_api.StatusCode);
   Console.WriteLine(scraper_api.Body);
 } catch(Exception ex) {
@@ -143,15 +168,27 @@ try {
 
 ## Leads API usage
 
-Initialize with your Leads API token and call the `GetAsync` method.
+Initialize with your Leads API token and call the `Get` method.
 
 ```csharp
 ProxyCrawl.LeadsAPI leads_api = new ProxyCrawl.LeadsAPI("YOUR_TOKEN");
 
 try {
-  await leads_api.GetAsync("stripe.com");
+  leads_api.Get("stripe.com");
   Console.WriteLine(leads_api.StatusCode);
   Console.WriteLine(leads_api.Body);
+  Console.WriteLine(leads_api.Success);
+  Console.WriteLine(leads_api.RemainingRequests);
+
+  foreach (var lead in leads_api.Leads)
+  {
+    Console.WriteLine(lead.Email);
+
+    foreach (var source in lead.Sources)
+    {
+      Console.WriteLine(source);
+    }
+  }
 } catch(Exception ex) {
   Console.WriteLine(ex.ToString());
 }
@@ -161,13 +198,13 @@ If you have questions or need help using the library, please open an issue or [c
 
 ## Screenshots API usage
 
-Initialize with your Screenshots API token and call the `GetAsync` method.
+Initialize with your Screenshots API token and call the `Get` method.
 
 ```csharp
 ProxyCrawl.ScreenshotsAPI screenshots_api = new ProxyCrawl.ScreenshotsAPI("YOUR_TOKEN");
 
 try {
-  await screenshots_api.GetAsync("https://www.apple.com");
+  screenshots_api.Get("https://www.apple.com");
   Console.WriteLine(screenshots_api.StatusCode);
   Console.WriteLine(screenshots_api.ScreenshotPath);
 } catch(Exception ex) {
@@ -181,7 +218,7 @@ or specifying a file path
 ProxyCrawl.ScreenshotsAPI screenshots_api = new ProxyCrawl.ScreenshotsAPI("YOUR_TOKEN");
 
 try {
-  await screenshots_api.GetAsync("https://www.apple.com", new Dictionary<string, object>() {
+  screenshots_api.Get("https://www.apple.com", new Dictionary<string, object>() {
     {"save_to_path", @"C:\Users\Default\Documents\apple.jpg"},
   });
   Console.WriteLine(screenshots_api.StatusCode);
@@ -191,13 +228,129 @@ try {
 }
 ```
 
-Note that `screenshots_api.GetAsync(url, options)` method accepts an [options](https://proxycrawl.com/docs/screenshots-api/parameters)
+Note that `screenshots_api.Get(url, options)` method accepts an [options](https://proxycrawl.com/docs/screenshots-api/parameters)
 
 Also note that `screenshots_api.Body` is a Base64 string representation of the binary image file.
 If you want to convert the body to bytes then you have to do the following:
 
 ```csharp
 byte[] bytes = Convert.FromBase64String(screenshots_api.Body);
+```
+
+## Storage API usage
+
+Initialize the Storage API using your private token.
+
+```csharp
+ProxyCrawl.StorageAPI storage_api = new ProxyCrawl.StorageAPI("YOUR_TOKEN");
+```
+
+Pass the [url](https://proxycrawl.com/docs/storage-api/parameters/#url) that you want to get from [Proxycrawl Storage](https://proxycrawl.com/dashboard/storage).
+
+```csharp
+try {
+  var response = storage_api.GetByUrl("https://www.apple.com");
+  Console.WriteLine(storage_api.StatusCode);
+  Console.WriteLine(storage_api.Body);
+  Console.WriteLine(response.OriginalStatus);
+  Console.WriteLine(response.ProxyCrawlStatus);
+  Console.WriteLine(response.URL);
+  Console.WriteLine(response.RID);
+  Console.WriteLine(response.StoredAt);
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
+```
+
+or you can use the [RID](https://proxycrawl.com/docs/storage-api/parameters/#rid)
+
+```csharp
+try {
+  var response = storage_api.GetByRID(RID);
+  Console.WriteLine(storage_api.StatusCode);
+  Console.WriteLine(storage_api.Body);
+  Console.WriteLine(response.OriginalStatus);
+  Console.WriteLine(response.ProxyCrawlStatus);
+  Console.WriteLine(response.URL);
+  Console.WriteLine(response.RID);
+  Console.WriteLine(response.StoredAt);
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
+```
+
+### [Delete](https://proxycrawl.com/docs/storage-api/delete/) request
+
+To delete a storage item from your storage area, use the correct RID
+
+```csharp
+try {
+  bool success = storage_api.Delete(RID);
+  Console.WriteLine(success);
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
+```
+
+### [Bulk](https://proxycrawl.com/docs/storage-api/bulk/) request
+
+To do a bulk request with a list of RIDs, please send the list of rids as an array
+
+```csharp
+try {
+  var list = new List<string>();
+  list.Add(RID1);
+  list.Add(RID2);
+  list.Add(RIDn);
+  var responses = storage_api.Bulk(list);
+  Console.WriteLine(storage_api.StatusCode);
+  foreach (var response in responses)
+  {
+    Console.WriteLine(response.OriginalStatus);
+    Console.WriteLine(response.ProxyCrawlStatus);
+    Console.WriteLine(response.URL);
+    Console.WriteLine(response.RID);
+    Console.WriteLine(response.StoredAt);
+    Console.WriteLine(response.Body);
+  }
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
+```
+
+### [RIDs](https://proxycrawl.com/docs/storage-api/rids) request
+
+To request a bulk list of RIDs from your storage area
+
+```csharp
+try {
+  var rids = storage_api.RIDs();
+  foreach (var rid in rids)
+  {
+    Console.WriteLine(rid);
+  }
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
+```
+
+You can also specify a limit as a parameter
+
+```csharp
+var rids = storage_api.RIDs(100);
+```
+
+### [Total Count](https://proxycrawl.com/docs/storage-api/total_count)
+
+To get the total number of documents in your storage area
+
+```csharp
+try {
+  var totalCount = storage_api.TotalCount();
+  Console.WriteLine(totalCount);
+} catch(Exception ex) {
+  Console.WriteLine(ex.ToString());
+}
 ```
 
 If you have questions or need help using the library, please open an issue or [contact us](https://proxycrawl.com/contact).
