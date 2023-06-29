@@ -1,3 +1,9 @@
+# DEPRECATION NOTICE
+
+> :warning: **IMPORTANT:** This library is no longer maintained or supported. For the latest updates, please use our new library at [crawlbase-net](https://github.com/crawlbase-source/crawlbase-net).
+
+---
+
 # ProxyCrawl
 
 .NET library for scraping and crawling websites using the ProxyCrawl API.
